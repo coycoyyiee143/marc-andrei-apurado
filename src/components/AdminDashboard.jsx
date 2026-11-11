@@ -15,6 +15,7 @@ const profileFields = [
   { name: 'linkedin', label: 'LinkedIn URL', type: 'url', hint: 'Full link starting with https://' },
 ]
 const emptyProfile = Object.fromEntries(profileFields.map(({ name }) => [name, '']))
+emptyProfile.resumeUrl = ''
 const emptyProject = {
   title: '',
   category: '',
@@ -105,6 +106,7 @@ function AdminDashboard({ user }) {
   const [projectForm, setProjectForm] = useState(emptyProject)
   const [editingId, setEditingId] = useState('')
   const [imageFile, setImageFile] = useState(null)
+  const [resumeFile, setResumeFile] = useState(null)
   const [imagePreview, setImagePreview] = useState('')
   const [galleryFiles, setGalleryFiles] = useState([])
   const [galleryPreviewUrls, setGalleryPreviewUrls] = useState([])
@@ -158,12 +160,20 @@ function AdminDashboard({ user }) {
   async function saveProfile(event) {
     event.preventDefault(); setIsSaving(true)
     try {
+      let resumeUrl = profile.resumeUrl || ''
+      if (resumeFile) {
+        resumeUrl = await uploadResume()
+      }
       await setDoc(doc(db, 'profile', 'main'), {
-        ...Object.fromEntries(profileFields.map(({ name }) => [name, profile[name] || ''])), updatedAt: serverTimestamp(),
+        ...Object.fromEntries(profileFields.map(({ name }) => [name, profile[name] || ''])),
+        resumeUrl,
+        updatedAt: serverTimestamp(),
       }, { merge: true })
+      setResumeFile(null)
       showSuccess('Profile saved', 'Makikita agad ito sa public portfolio.')
-    } catch { showError('Hindi na-save ang profile. I-check ang Firebase setup at Firestore rules.') }
-    finally { setIsSaving(false) }
+    } catch (error) {
+      showError(error instanceof Error ? error.message : 'Hindi na-save ang profile. I-check ang Firebase setup at Firestore rules.')
+    } finally { setIsSaving(false) }
   }
 
   function editProject(project) {
@@ -244,6 +254,40 @@ function AdminDashboard({ user }) {
   function selectGalleryImages(event) {
     addGalleryImages(event.target.files)
     event.target.value = ''
+  }
+
+  function selectResume(event) {
+    const file = event.target.files?.[0] || null
+    if (!file) return
+    if (file.type !== 'application/pdf') {
+      showError('PDF file lang ang puwedeng i-upload sa resume.')
+      event.target.value = ''
+      return
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      showError('Maximum na 10 MB ang resume PDF.')
+      event.target.value = ''
+      return
+    }
+    setResumeFile(file)
+  }
+
+  async function uploadResume() {
+    if (!resumeFile) return profile.resumeUrl || ''
+    const cloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME || 'cj3iusnm'
+    const uploadPreset = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET
+    if (!uploadPreset) throw new Error('I-set ang VITE_CLOUDINARY_UPLOAD_PRESET sa .env.local.')
+
+    const uploadData = new FormData()
+    uploadData.append('file', resumeFile)
+    uploadData.append('upload_preset', uploadPreset)
+    const response = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/raw/upload`, {
+      method: 'POST',
+      body: uploadData,
+    })
+    const result = await response.json()
+    if (!response.ok) throw new Error(result.error?.message || 'Hindi na-upload ang resume PDF.')
+    return result.secure_url
   }
 
   async function saveProject(event) {
@@ -384,6 +428,17 @@ function AdminDashboard({ user }) {
                   {field.hint && <span className="dash-hint" id={`profile-${field.name}-hint`}>{field.hint}</span>}
                 </div>
               ))}
+              <div className="dash-field dash-span-2">
+                <label htmlFor="profile-resume">Resume (PDF)</label>
+                <input id="profile-resume" type="file" accept="application/pdf" onChange={selectResume} />
+                <span className="dash-hint">Upload a PDF resume for visitors to download from your portfolio.</span>
+                {profile.resumeUrl && (
+                  <div className="dash-file-actions">
+                    <a className="dash-file-link" href={profile.resumeUrl} target="_blank" rel="noreferrer">Open current resume</a>
+                    <button type="button" className="dash-link-btn dash-link-danger" onClick={() => setProfile({ ...profile, resumeUrl: '' })}>Remove resume</button>
+                  </div>
+                )}
+              </div>
               <div className="dash-actions dash-span-2">
                 <button className="dash-btn dash-btn-primary" type="submit" disabled={isSaving}>{isSaving ? 'Saving...' : 'Save profile'}</button>
               </div>

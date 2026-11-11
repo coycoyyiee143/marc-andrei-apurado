@@ -6,7 +6,7 @@ import { autoGravity } from '@cloudinary/url-gen/qualifiers/gravity'
 import { collection, doc, onSnapshot } from 'firebase/firestore'
 import { db, isFirebaseConfigured } from '../firebase'
 
-const emptyProfile = { name: '', role: '', location: '', email: '', bio: '', objective: '', github: '', linkedin: '' }
+const emptyProfile = { name: '', role: '', location: '', email: '', bio: '', objective: '', github: '', linkedin: '', resumeUrl: '' }
 const DISPLAY_WORD_LIMIT = 50
 const ALL = 'All'
 const cloudinary = new Cloudinary({ cloud: { cloudName: import.meta.env.VITE_CLOUDINARY_CLOUD_NAME || 'cj3iusnm' } })
@@ -200,7 +200,12 @@ function PortfolioView() {
             />
             <div className="hero-actions">
               <a className="button button-primary" href="#projects">View my work</a>
-              {profile.email && <a className="button button-ghost" href={`mailto:${profile.email}`}>Email me</a>}
+              {(profile.email || profile.resumeUrl) && (
+                <div className="hero-contact-actions">
+                  {profile.email && <a className="button button-ghost" href={`mailto:${profile.email}`}>Email me</a>}
+                  {profile.resumeUrl && <a className="button button-ghost" href={profile.resumeUrl} target="_blank" rel="noreferrer">Download resume</a>}
+                </div>
+              )}
             </div>
           </div>
         </section>
@@ -212,6 +217,7 @@ function PortfolioView() {
             <div className="social-links">
               {profile.github && <a href={profile.github} target="_blank" rel="noreferrer">GitHub <span aria-hidden="true">↗</span></a>}
               {profile.linkedin && <a href={profile.linkedin} target="_blank" rel="noreferrer">LinkedIn <span aria-hidden="true">↗</span></a>}
+              {profile.resumeUrl && <a href={profile.resumeUrl} target="_blank" rel="noreferrer">Resume <span aria-hidden="true">↗</span></a>}
               {profile.email && <a href={`mailto:${profile.email}`}>Email <span aria-hidden="true">↗</span></a>}
             </div>
           </div>
